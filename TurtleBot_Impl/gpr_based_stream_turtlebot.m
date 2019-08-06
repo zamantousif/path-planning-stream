@@ -286,6 +286,7 @@ for t = 0.00:tstep:tf
  
 end
 
+
 %% Plot what is required
 figure('Name','Trajectory Plot of Robot and Obstacle');
 plot(zinit(1,:), zinit(2,:),'b-');
