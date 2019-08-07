@@ -1,23 +1,22 @@
 %% Script to connect MATLAB and VICON Motion Capture System
 
-% Clear the workspace
-clc;
-clear;
-
 %% DO THIS BEFORE RUNNING THIS SCRIPT
-% Open a Terminal and run the below command to launch VICON at the IP
+% Open a terminal on PC and run the below command to launch VICON at the IP
 % address specified (cross-check the IP of the system running VICON)
 
 % roslaunch vicon_bridge vicon.launch ip:= 130.215.206.243
 
+%% Clear the workspace
+clc;
+clear;
+
+%% Set ROS environment variables and initialize ROS
 % create a ROS MASTER
 % master = robotics.ros.Core; % use if master_uri is same as ros_ip
 
 ROS_IP = '130.215.206.232';
 ROS_MASTER_URI = 'http://130.215.121.108:11311'; % URI of TurtleBot
-
-% Set ROS environment variables and initialize ROS with MASTER at the 
-% specified IP address
+% Initialize ROS with MASTER at the specified IP address
 initialize_ros(ROS_IP, ROS_MASTER_URI);
 
 %% Subscribe to the VICON topic to get Stationary Obstacle state feedback
@@ -46,6 +45,7 @@ quatZ = turtlebot_pose_data.Transform.Rotation.Z;
 angles = quat2eul([quatW quatX quatY quatZ]); % Euler ZYX
 theta0 = rad2deg(angles(1));
 
+%% Velocity Publisher
 % Create a ROS publisher and message for velocity topic
 my_turtlebot = rospublisher('/mobile_base/commands/velocity');
 velmsg = rosmessage(my_turtlebot);
@@ -66,5 +66,5 @@ velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
 % Publish velocity and steer to the TurtleBot
 send(my_turtlebot, velmsg);
 
-
+%% Terminate ROS connectivity
 terminate_ros();
