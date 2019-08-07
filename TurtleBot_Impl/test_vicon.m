@@ -46,4 +46,25 @@ quatZ = turtlebot_pose_data.Transform.Rotation.Z;
 angles = quat2eul([quatW quatX quatY quatZ]); % Euler ZYX
 theta0 = rad2deg(angles(1));
 
+% Create a ROS publisher and message for velocity topic
+my_turtlebot = rospublisher('/mobile_base/commands/velocity');
+velmsg = rosmessage(my_turtlebot);
+
+% Move the TurtleBot towards the origin and sync the time with ROS
+velocityX = 0.1;
+velocityY = 0.2;
+omegaZ = 5;
+
+% Velocity in X and Y axes
+% Velocity is limited to safe values
+velmsg.Linear.X = limiter_min_max(velocityX, -0.7, 0.7); % 0.7m/s
+velmsg.Linear.Y = limiter_min_max(velocityY, -0.7, 0.7); % 0.7m/s
+
+% Steer about Z-axis
+velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+
+% Publish velocity and steer to the TurtleBot
+send(my_turtlebot, velmsg);
+
+
 terminate_ros();
