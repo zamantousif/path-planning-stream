@@ -50,21 +50,36 @@ theta0 = rad2deg(angles(1));
 my_turtlebot = rospublisher('/mobile_base/commands/velocity');
 velmsg = rosmessage(my_turtlebot);
 
-% Move the TurtleBot towards the origin and sync the time with ROS
-velocityX = 0.1;
-velocityY = 0.2;
-omegaZ = 5;
+%% Move the TurtleBot towards the origin and sync the time with ROS
+% set time step
+tf = 10;
+dt = 0.01;
 
-% Velocity in X and Y axes
-% Velocity is limited to safe values
-velmsg.Linear.X = limiter_min_max(velocityX, -0.7, 0.7); % 0.7m/s
-velmsg.Linear.Y = limiter_min_max(velocityY, -0.7, 0.7); % 0.7m/s
+% r = robotics.ros.Rate(node,10);
+r = rosrate(100);
+tic;
+reset(r)
+for t = 0:dt:tf
+    
+    velocityX = 0.1;
+    velocityY = -0.2;
+    omegaZ = -1;
 
-% Steer about Z-axis
-velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+    % Velocity in X and Y axes
+    % Velocity is limited to safe values
+    velmsg.Linear.X = limiter_min_max(velocityX, -0.7, 0.7); % 0.7m/s
+    velmsg.Linear.Y = limiter_min_max(velocityY, -0.7, 0.7); % 0.7m/s
 
-% Publish velocity and steer to the TurtleBot
-send(my_turtlebot, velmsg);
+    % Steer about Z-axis
+    velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+
+    % Publish velocity and steer to the TurtleBot
+    send(my_turtlebot, velmsg);
+    % Wait the desired Hz time for the actuators to react
+    waitfor(r);
+    disp(t)
+end
+toc;
 
 %% Terminate ROS connectivity
 terminate_ros();
