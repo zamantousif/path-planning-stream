@@ -1,0 +1,33 @@
+## Assumptions
+
+#1 VICON data is received at 100Hz but the control loop runs at much smaller frequency. 
+The state feedback is therefore not that accurate, however the robot and obstacle are not
+moving fast/moving throughout so I think this should be ok.
+
+#2 For a moving obstacle, a constant velocity is considered in the state feedback part and used for the stream function calculations, assuming that the velocity remains constant at all times.
+
+
+## Observations
+
+#1 Actuator delay is ~1s. No matter what frequency (10Hz-100Hz) is set for
+the calculation/control loop, there is no response for the initial ~1s.
+
+#2 The number of loop iterations were set in such a way that for frequency 
+in range (10Hz-100Hz), the total execution time of this calculation/control
+loop would be atleast ~10s of which the first 1s would have no response 
+from the actuators. Post 1s duration, the actuators begin to respond to the
+control values and therefore a smooth movement is observed.
+
+#3 dT or time step has no significance on the actual time elapsed unless it
+is synchronized to the loop execution rate. 
+e.g. 
+tf = 10;
+dt = 0.01;
+r = rosrate(100);
+for t = 0:dt:tf
+
+number of iterations = 10/0.01 = 1000
+time of each iteration = 1/100 = 0.01s
+total execution time = 0.01*1000 = 10s
+
+

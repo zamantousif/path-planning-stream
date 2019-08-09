@@ -7,7 +7,8 @@
 % % Initialize ROS and connect to TurtleBot
 % ip_turtlebot = '130.215.121.108';
 % rosinit(ip_turtlebot)
-% Alternatively, call this function
+% Alternatively, call these functions
+initialize_ros();
 initialize_turtlebot();
 
 velocityX = 0.1;     % meters per second
@@ -44,4 +45,4 @@ by0 = obstacle_pose.Position.Y;
 % Disconnect from the ROS network
 % rosshutdown
 % Alternatively, call this function
-terminate_turtlebot();
+terminate_ros();

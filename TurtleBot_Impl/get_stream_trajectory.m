@@ -6,7 +6,7 @@ ynew= z(2);
 % planning for the horizon
 
 %% Run the horizon
-for i= 1:1:7
+for i= 1:1:2
     obs_pose = obstaclepred(i,:);
     bx= obs_pose(1);
     by= obs_pose(2);
@@ -41,10 +41,10 @@ for i= 1:1:7
 %     v = Vref*sin(theta);
     xnew= xnew + U1*tstep;
     ynew= ynew + V1*tstep;
-    % velocity
+    % linear velocity
     vstep= U1*cos(theta)+V1*sin(theta);
     traj(4,i)= vstep;
-    % steering = dOmega = (calculated_step_theta - last_step_theta)/time
+    % angular velocity = dOmega = (current_step_theta - last_step_theta)/dt
     traj(5,i)= (theta-traj(3,i))/tstep;
     
     % store the new predicted robot states of the horizon

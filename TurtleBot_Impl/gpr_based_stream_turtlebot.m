@@ -101,7 +101,6 @@ zinit= [x0;y0;theta0];
 % store the robot state with MPC
 zmpc= [x0;y0;theta0];
 
-figure;
 %% Update radii of the robot and obstacle
 if enable_ros == true
     % Physical dimensions of TurtleBot and obstacle
@@ -114,11 +113,13 @@ else
 end
 
 %% MPC block
+
 % controller params
 N = 7; % length of window
 Q = [1;1;1];
-R = [0.1;0.1];
-u_max = [0.47;3.77]; % controller boundary
+R = [1;1];
+% actuator constraints
+u_max = [0.7;180]; % controller boundary; v = 0.7m/s, w = 180deg/s
 warm_start = [0;0;0;0;0;0;0;0;0;0;0;0;0;0];
 
 % calculation of const params
@@ -129,20 +130,30 @@ d = [repmat(u_max,[N,1]);repmat(u_min,[N,1])];
 D = [eye(2*N);-eye(2*N)];
 k=1;
 
-% Initialize simulation time and horizon time step
-tf = 100.00;
-tstep = 0.10;
+%% Initialize simulation time and horizon time step
+tf = 10;
+tstep = 0.1; % For a loop rate = 10Hz
 
-%% Sync the time horizon with ROS state_fb
+%% Sync the time horizon with ROS
+% r = robotics.ros.Rate(node,10);
+r = rosrate(10);
+tic;
+reset(r)
 
 % Run the simulation for the simulation time with tstep increments
-for t = 0.00:tstep:tf    
+for t = 0:tstep:tf
     %% Obstacle prediction using GPR
     
     % current coordinates and velocity calculation for the obstacle
+    % assuming the velocity of the obstacles are constant
+    % current velocity of obstacle = initial velocity of obstacle
     % provide the current state of the obstacle here
-    bx= bx0 + vx0*t; 
-    by= by0 + vy0*t;
+    obstacle_curr_state = receive(obstacle_sub,3); % timeout of 3s
+    bx0_curr = obstacle_curr_state.Transform.Translation.X;
+    by0_curr = obstacle_curr_state.Transform.Translation.Y;
+    
+    bx= bx0_curr + vx0*t; 
+    by= by0_curr + vy0*t;
     vx= vx0;
     vy= vy0;
     Xtrain =[Xtrain;t];
@@ -161,7 +172,12 @@ for t = 0.00:tstep:tf
     gprMdvy = fitrgp(Xtrain,VYtrain,'Basis','linear','FitMethod','exact','PredictMethod','exact');
     
     %% create future time step horizon, sync with ROS
-    Xtrain_pred=[t;t+0.1;t+0.2;t+0.3;t+0.4;t+0.5;t+0.6;t+0.7];
+%     Xtrain_pred=[t;t+0.1;t+0.2;t+0.3;t+0.4;t+0.5;t+0.6;t+0.7];
+    
+%   testing
+    Xtrain_pred=[t;t+0.1];
+%   testing
+
     % prediction from GPR for the horizon
     [bxtestpred] = predict(gprMdbx,Xtrain_pred);
     [bytestpred] = predict(gprMdby,Xtrain_pred);
@@ -172,8 +188,21 @@ for t = 0.00:tstep:tf
     
     %% trajectory planning
     
-    % provide the current state of the robot
-    current_state = [x0;y0;theta0];
+    %% provide the current state of the robot
+    turtlebot_curr_state = receive(turtlebot_sub,3); % timeout of 3s
+    x0_curr = turtlebot_curr_state.Transform.Translation.X;
+    y0_curr = turtlebot_curr_state.Transform.Translation.Y;
+
+    quatW_curr = turtlebot_curr_state.Transform.Rotation.W;
+    quatX_curr = turtlebot_curr_state.Transform.Rotation.X;
+    quatY_curr = turtlebot_curr_state.Transform.Rotation.Y;
+    quatZ_curr = turtlebot_curr_state.Transform.Rotation.Z;
+    
+    % Euler ZYX
+    angles_curr = quat2eul([quatW_curr quatX_curr quatY_curr quatZ_curr]);
+    theta0_curr = rad2deg(angles_curr(1));
+    
+    current_state = [x0_curr;y0_curr;theta0_curr];
     traj= get_stream_trajectory(tstep,current_state,obstacle_type,obstaclepred);
     
     % get desired robot state from horizon data
@@ -189,8 +218,9 @@ for t = 0.00:tstep:tf
     % plot(traj(1,:), traj(2,:),'r-');
     % hold on
     
-    % Stop when robot state is very close to origin
-    if x0*x0 + y0*y0 <= 1
+    %% Stop when robot is found very close to origin
+    dist_from_origin = sqrt(x0_curr*x0_curr + y0_curr*y0_curr);
+    if dist_from_origin <= 1
         break;
     end
     
@@ -208,57 +238,66 @@ for t = 0.00:tstep:tf
 %     delete(vch1);
     
     
+%     
+%     %% MPC
+%     % get the velocity and state values from stream function
+%     vr= traj(4,:);
+%     qr= traj(1:3,:);
+%     
+%     % check time step for MPC calculation for turtlebot simulation
+%     dt=tstep;
+%     % update A and B matrix for the window
+%     for i = 1:N
+%         A(:,:,i) = [1, 0, -vr(i)*sin(qr(3,i)*dt);
+%             0, 1, vr(i)*cos(qr(3,i)*dt)
+%             0, 0 ,1];
+%         B(:,:,i) = [cos(qr(3,i))*dt, 0;
+%             sin(qr(3,i))*dt, 0;
+%             0, dt];
+%     end
+%     
+%     
+%    % introduce new Ahat(3N,3), Bhat(3N,2N)
+%     Ahat = repmat(eye(3,3),N,1);
+%     Bhat = repmat(zeros(3,2),N,N);
+%     for i = 1:N
+%         Bhat(i*3-2:end,i*2-1:i*2) = repmat(B(:,:,i),N+1-i,1);
+%         for j = i:N
+%             Ahat(j*3-2:j*3,:) = A(:,:,i)*Ahat(j*3-2:j*3,:);
+%             for m = i+1:j
+%                 Bhat(j*3-2:j*3,i*2-1:i*2) = A(:,:,m)*Bhat(j*3-2:j*3,i*2-1:i*2);
+%             end
+%         end
+%     end
+% 
+%     % Optimization
+%     % ehat= [0.00001;0.00001;0.00001];
+%     ehat = [x0_curr-x0_d; y0_curr-y0_d; theta0_curr-theta0_d];
+%     H = 2*(Bhat'*Qhat*Bhat+Rhat);
+%     f = 2*Bhat'*Qhat*Ahat*ehat;
+%     OPTIONS = optimset('Display','off','MaxIter',5);
+%     % OPTIONS = optimset('Display','off');
+%     q_op = quadprog(H,f,[],[],[],[],[],[],warm_start,OPTIONS);
+%     
+%     warm_start = q_op;
     
-    %% MPC
-    vr= traj(4,:);
-    qr= traj(1:3,:);
-    
-    % check time step for MPC calculation for turtlebot simulation
+%   testing
     dt=tstep;
-     % update A and B matrix for the window
-    for i = 1:N
-        A(:,:,i) = [1, 0, -vr(i)*sin(qr(3,i)*dt);
-            0, 1, vr(i)*cos(qr(3,i)*dt)
-            0, 0 ,1];
-        B(:,:,i) = [cos(qr(3,i))*dt, 0;
-            sin(qr(3,i))*dt, 0;
-            0, dt];
-    end
+    q_op(1) = 0;
+    q_op(2) = 0;
+%   testing
     
-    
-   % introduce new Ahat(3N,3), Bhat(3N,2N)
-    Ahat = repmat(eye(3,3),N,1);
-    Bhat = repmat(zeros(3,2),N,N);
-    for i = 1:N
-        Bhat(i*3-2:end,i*2-1:i*2) = repmat(B(:,:,i),N+1-i,1);
-        for j = i:N
-            Ahat(j*3-2:j*3,:) = A(:,:,i)*Ahat(j*3-2:j*3,:);
-            for m = i+1:j
-                Bhat(j*3-2:j*3,i*2-1:i*2) = A(:,:,m)*Bhat(j*3-2:j*3,i*2-1:i*2);
-            end
-        end
-    end
-
-    
-    ehat= [0.00001;0.00001;0.00001];
-    H = 2*(Bhat'*Qhat*Bhat+Rhat);
-    f = 2*Bhat'*Qhat*Ahat*ehat;
-    OPTIONS = optimset('Display','off','MaxIter',5);
-    % OPTIONS = optimset('Display','off');
-    q_op = quadprog(H,f,[],[],[],[],[],[],warm_start,OPTIONS);
-    
-    warm_start = q_op;
-    
-    % take velocity from stream function and use current theta for next
-    % step calculations
-    x0 = x0+(traj(4,1)+q_op(1))*cos(theta0)*dt;
-    y0 = y0+(traj(4,1)+q_op(1))*sin(theta0)*dt;
-    theta0 = theta0+(traj(5,1)+q_op(2))*dt;
+    % take velocity from stream function 
+    % use current values of theta for next step calculations ?
+    %% theta0_curr OR traj(3,1) % traj(3,1) = theta0_curr in code
+    x0_curr = x0_curr + (traj(4,1)+q_op(1))*cos(theta0_curr)*dt; 
+    y0_curr = y0_curr + (traj(4,1)+q_op(1))*sin(theta0_curr)*dt;
+    theta0_curr = theta0_curr + (traj(5,1)+q_op(2))*dt;
     
     %% Send control inputs to TurtleBot
     % Control inputs for TurtleBot
-    velocityX = (traj(4,1)+q_op(1))*cos(theta0);
-    velocityY = (traj(4,1)+q_op(1))*sin(theta0);
+    velocityX = (traj(4,1)+q_op(1))*cos(theta0_curr);
+    velocityY = (traj(4,1)+q_op(1))*sin(theta0_curr);
     omegaZ = traj(5,1)+q_op(2);
     
     if enable_ros == true
@@ -268,47 +307,59 @@ for t = 0.00:tstep:tf
 
         % Velocity in X and Y axes
         % Velocity is limited to safe values
-        velmsg.Linear.X = limiter_min_max(velocityX, -0.7, 0.7); % 0.7m/s
-        velmsg.Linear.Y = limiter_min_max(velocityY, -0.7, 0.7); % 0.7m/s
+        %velmsg.Linear.X = limiter_min_max(velocityX, -0.7, 0.7); % 0.7m/s
+        %velmsg.Linear.Y = limiter_min_max(velocityY, -0.7, 0.7); % 0.7m/s
 
+        velmsg.Linear.X = velocityX;
+        velmsg.Linear.Y = velocityY;
+        
         % Steer about Z-axis
-        velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
-
+        %velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+        velmsg.Angular.Z = omegaZ;
+        
         % Publish velocity and steer to the TurtleBot
         send(my_turtlebot, velmsg);
+        
+        %% Wait the desired Hz time for the actuators to react
+        waitfor(r);
     end
     
-    %% Final robot state calculated using Stream function and MPC
-    zf=[x0;y0;theta0];
-    % total robot state/trajectory using MPC
-    zmpc=[zmpc,zf];
-    
-    xlim([0 10]);
-    ylim([0 10]);
-    
-    vch1 = viscircles([bx,by], radius_obs,'Color','r');
-    %figure('Name','Realtime trajectory Plot of Robot and Obstacle');
-    plot(bxtestpred, bytestpred,'r-');
-    vch = viscircles([x0,y0], radius_robot,'Color','g');
-    plot(traj(1,:), traj(2,:),'g-');
-    legend({'Robot','Obstacle'})
-    
-    hold on;
-    pause(0.01);
-    delete(vch);
-    delete(vch1);
+    if enable_ros == false
+        %% Final robot state calculated by Stream function and corrected by MPC
+        zf=[x0_curr;y0_curr;theta0_curr];
+        % total robot state/trajectory using MPC
+        zmpc=[zmpc,zf];
+
+        xlim([0 10]);
+        ylim([0 10]);
+
+        vch1 = viscircles([bx,by], radius_obs,'Color','r');
+        %figure('Name','Realtime trajectory Plot of Robot and Obstacle');
+        plot(bxtestpred, bytestpred,'r-');
+        vch = viscircles([x0_curr,y0_curr], radius_robot,'Color','g');
+        plot(traj(1,:), traj(2,:),'g-');
+        legend({'Robot','Obstacle'})
+
+        hold on;
+        pause(0.01);
+        delete(vch);
+        delete(vch1);
+    end
  
 end
+toc;
 
-%% Plot what is required
-figure('Name','Trajectory Plot of Robot and Obstacle');
-plot(zinit(1,:), zinit(2,:),'b-');
-hold on
-plot(zmpc(1,:), zmpc(2,:),'g-');
-hold on
-plot(bXtrain, bYtrain,'r-');
-hold on
-legend({'Robot trajectory from Stream Function','Robot trajectory using MPC','Obstacle trajectory using GPR'},'Location','southeast')
+if enable_ros == false
+    %% Plot what is required
+    figure('Name','Trajectory Plot of Robot and Obstacle');
+    plot(zinit(1,:), zinit(2,:),'b-');
+    hold on
+    plot(zmpc(1,:), zmpc(2,:),'g-');
+    hold on
+    plot(bXtrain, bYtrain,'r-');
+    hold on
+    legend({'Robot trajectory from Stream Function','Robot trajectory using MPC','Obstacle trajectory using GPR'},'Location','southeast')
+end
 
 %% Terminate ROS connectivity
 if enable_ros == true
