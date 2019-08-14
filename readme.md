@@ -42,15 +42,15 @@ Run the below commands in sequence
 #### On the TurtleBot2:
 
 Launch a terminal then run
-
-- roslaunch turtlebot_bringup minimal.launch
-
+'''
+roslaunch turtlebot_bringup minimal.launch
+'''
 #### On the Workstation/Laptop running MATLAB:
 
 Launch a terminal then run
-
-- roslaunch vicon_bridge vicon.launch ip_vicon:=<enter ip address of VICON>
-
+'''
+roslaunch vicon_bridge vicon.launch ip_vicon:=<enter ip address of VICON>
+'''
 Launch MATLAB, open TurtleBot_Impl (available on this repo) then run the below M script
 
 - gpr_based_stream_turtlebot.m
