@@ -49,7 +49,7 @@ Launch a terminal then run
 
 Launch a terminal then run
 
-- roslaunch vicon_bridge vicon.launch ip_vicon:=<enter ip of vicon>
+- roslaunch vicon_bridge vicon.launch ip_vicon:=<enter ip address of VICON>
 
 Launch MATLAB, open TurtleBot_Impl (available on this repo) then run the below M script
 
