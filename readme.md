@@ -1,4 +1,6 @@
-## Implementation on TurtleBot2
+## path-planning-stream
+
+## Implementation of vehicle path planning using stream functions on TurtleBot2
 
 ### **File List:**
 
@@ -16,6 +18,11 @@
 
 ### **Simulation**:
 
+**Stationary Obstacle:**
+- Run stream_stationary.m
+
+**Moving Obstacle**
+- Run stream_moving.m
 
 
 ### **Real Demonstration:**
