@@ -1,9 +1,19 @@
 ## path-planning-stream
+Implementation of vehicle path planning using stream functions on TurtleBot2
 
-## Implementation of vehicle path planning using stream functions on TurtleBot2
+### **File Structure:**
+#### **Stream_Function**
+Simulation of stream function in MATLAB
 
-### **File List:**
+#### **Stream_Function_ODE**
+Simulation using ODE function in MATLAB
 
+#### **GPR_based_stream_MPC**
+Simulation of obstacle avoidance with stream function + GPR + MPC in MATLAB
+
+#### **TurtleBot_Impl**
+Implementation of stream function based obstacle avoidance for stationary obstacle on TurtleBot2
+##### **Required:**
 - gpr_based_stream_turtlebot.m (main)
 - get_stream_trajectory.m
 - initialize_ros.m
@@ -25,7 +35,7 @@
 - Run stream_moving.m
 
 
-### **Real Demonstration:**
+### **Demonstration:**
 
 Run the below commands in sequence
 
@@ -46,7 +56,6 @@ Launch MATLAB, open TurtleBot_Impl (available on this repo) then run the below M
 - gpr_based_stream_turtlebot.m
 
 ### **Additional:**
-
 - TurtleBot 2 runs on ROS Indigo
 - TurtleBot 2 has turtlebot_bringup, turtlebot_gazebo packages setup already
 - VICON Tracker 3.4.x setup on workstation with 8 overhead + 2 tripod mounted cameras
