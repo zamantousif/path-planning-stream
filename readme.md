@@ -1,7 +1,7 @@
 ## path-planning-stream
 Implementation of vehicle path planning using stream functions on TurtleBot2
 
-### **File Structure:**
+### **Folder Structure:**
 #### **Stream_Function**
 Simulation of stream function in MATLAB
 
@@ -13,7 +13,7 @@ Simulation of obstacle avoidance with stream function + GPR + MPC in MATLAB
 
 #### **TurtleBot_Impl**
 Implementation of stream function based obstacle avoidance for stationary obstacle on TurtleBot2
-##### **Required:**
+##### **Required Files:**
 - gpr_based_stream_turtlebot.m (main)
 - get_stream_trajectory.m
 - initialize_ros.m
