@@ -1,6 +1,7 @@
 %% DO THIS BEFORE RUNNING THIS SCRIPT
-% Open a terminal on PC and run the below command to launch VICON at the IP
-% address specified (cross-check the IP of the system running VICON)
+% Open a terminal on TurtleBot and run the below command to launch VICON 
+% at the IP address specified (cross-check the IP of the system running 
+% VICON)
 
 % roslaunch vicon_bridge vicon.launch ip:=130.215.206.243
 
@@ -69,7 +70,7 @@ if state_fb == 0
     by0= 1.2;
 elseif state_fb == 1
     % Subscribe to the VICON topic to get TurtleBot state feedback
-    turtlebot_sub = rossubscriber('/vicon/turtlebot_traj_track/turtlebot_traj_track');
+    turtlebot_sub = rossubscriber('/vicon/turtlebot_traj_track/turtlebot_traj_track1');
     
     %% Provide the initial/starting state of robot
     % Get x0 y0 theta0 of TurtleBot
@@ -173,14 +174,14 @@ k=1;
 
 %% Initialize simulation time and horizon time step
 tf = 10;
-tstep = 0.1; % For a loop rate = 10Hz
+tstep = 1; % For a loop rate = 10Hz
 
 %% Sync the time horizon with ROS
 % r = robotics.ros.Rate(node,10);
-r = rosrate(10);
+r = rosrate(1);
 tic;
 reset(r)
-
+pause on
 % Run the simulation for the simulation time with tstep increments
 for t = 0:tstep:tf
     %% Obstacle prediction using GPR
@@ -352,6 +353,7 @@ for t = 0:tstep:tf
     velocityX = (traj(4,1)+q_op(1))*cos(theta0);
     velocityY = (traj(4,1)+q_op(1))*sin(theta0);
     omegaZ = traj(5,1)+q_op(2);
+    omegaZ_rad = deg2rad(omegaZ);
     
     velocityLinTot = sqrt(velocityX^2 + velocityY^2);
     
@@ -376,7 +378,7 @@ for t = 0:tstep:tf
         
         % Steer about Z-axis
         %velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
-        velmsg.Angular.Z = deg2rad(omegaZ); % enter in radians
+        velmsg.Angular.Z = omegaZ_rad; % enter in radians
         
         % Publish velocity and steer to the TurtleBot
         send(my_turtlebot, velmsg);
