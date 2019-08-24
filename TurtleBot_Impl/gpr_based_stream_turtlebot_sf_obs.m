@@ -31,10 +31,10 @@ if enable_ros == true
 
     % Set ROS_IP and ROS_MASTER_URI
     setenv('ROS_IP','130.215.206.232')
-    setenv('ROS_MASTER_URI','http://130.215.223.68:11311')
+    setenv('ROS_MASTER_URI','http://130.215.171.227:11311')
 
     % Initialize ROS and connect to TurtleBot
-    ip_turtlebot = '130.215.223.68';
+    ip_turtlebot = '130.215.171.227';
     rosinit(ip_turtlebot)
     
 end
@@ -84,7 +84,8 @@ elseif state_fb == 1
     quatZ = turtlebot_pose_data.Transform.Rotation.Z;
 
     angles = quat2eul([quatW quatX quatY quatZ]); % Euler ZYX
-    theta0 = rad2deg(angles(1));
+%     theta0 = rad2deg(angles(1));
+    theta0 = angles(1);
     
     % Subscribe to the VICON topic to get Stationary Obstacle state feedback
     obstacle_sub = rossubscriber('/vicon/stationary_obs_track/stationary_obs_track');
@@ -160,8 +161,9 @@ N = 7; % length of window
 Q = [1;1;1];
 R = [1;1];
 % actuator constraints
-% u_max = [0.7;180]; % controller boundary; v = 0.7m/s, w = 180deg/s
-u_max = [10;10]; 
+% u_max = [0.7;180]; % controller boundary; v = 0.7m/s, w = 180deg/s = pi
+% rad/s
+u_max = [1;pi]; % v = 1m/s, w = pi rad/s
 warm_start = [0;0;0;0;0;0;0;0;0;0;0;0;0;0];
 
 % calculation of const params
@@ -247,7 +249,8 @@ for t = 0:tstep:tf
     
     % Euler ZYX
     angles_curr = quat2eul([quatW_curr quatX_curr quatY_curr quatZ_curr]);
-    theta0_curr = rad2deg(angles_curr(1));
+    theta0_curr = angles_curr(1);
+%     theta0_curr = rad2deg(angles_curr(1));
     
     current_state = [x0_curr;y0_curr;theta0_curr];
     traj= get_stream_trajectory(tstep,current_state,obstacle_type,obstaclepred);
@@ -353,9 +356,19 @@ for t = 0:tstep:tf
     velocityX = (traj(4,1)+q_op(1))*cos(theta0);
     velocityY = (traj(4,1)+q_op(1))*sin(theta0);
     omegaZ = traj(5,1)+q_op(2);
-    omegaZ_rad = deg2rad(omegaZ);
+%     omegaZ_rad = deg2rad(omegaZ);
     
     velocityLinTot = sqrt(velocityX^2 + velocityY^2);
+    
+    %% Velocity Limitation Status
+    if abs(velocityLinTot) > 1
+        velocity_limit_reqd = true;
+        disp('Velocity limitation active')
+    else
+        velocity_limit_reqd = false;
+        disp('Velocity limitation not active')
+    end
+    
     
     if enable_ros == true
         % Create a ROS publisher and message for velocity topic
@@ -372,19 +385,66 @@ for t = 0:tstep:tf
         %velmsg.Linear.X = velocityX;
         %velmsg.Linear.Y = velocityY;
         
-        % Total Linear Velocity
-        velmsg.Linear.X = velocityLinTot;
-        velmsg.Linear.Y = 0;
+        %% Select and apply velocity limitation loop
         
-        % Steer about Z-axis
-        %velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
-        velmsg.Angular.Z = omegaZ_rad; % enter in radians
-        
-        % Publish velocity and steer to the TurtleBot
-        send(my_turtlebot, velmsg);
-        
-        %% Wait the desired Hz time for the actuators to react
-        waitfor(r);
+        if velocity_limit_reqd == true
+            
+            %% Velocity Limitation Block
+            % Initialize the limits
+            OldMin = min(nonzeros(traj(4,:)));
+            OldMax = max(nonzeros(traj(4,:)));
+            NewMin = 0;
+            NewMax = 1;
+            row = 1;
+            
+            for OldValue = traj(4,:)    
+
+                if (OldMin ~= OldMax && NewMin ~= NewMax)
+                    NewValue = ((((OldValue - OldMin) * (NewMax - NewMin)) / (OldMax - OldMin)) + NewMin);
+                else
+                    NewValue = (NewMax + NewMin) / 2;
+                end
+
+                VelList(row,:) = NewValue;
+                % Apply the new velocity
+                velmsg.Linear.X = NewValue;
+                row = row + 1;
+
+                % ----
+
+                % Total Linear Velocity
+                % velmsg.Linear.X = velocityLinTot;
+                velmsg.Linear.Y = 0;
+                % Steer about Z-axis
+                %velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+%                 velmsg.Angular.Z = omegaZ_rad; % calculation in deg but converted to radians
+                velmsg.Angular.Z = omegaZ; % calculation is in radians
+                % Publish velocity and steer to the TurtleBot
+                send(my_turtlebot, velmsg);
+
+                %% Wait the desired Hz time for the actuators to react
+                waitfor(r);
+
+                % ----
+
+            end
+            
+        else
+            % Total Linear Velocity
+            velmsg.Linear.X = velocityLinTot;
+            velmsg.Linear.Y = 0;
+            % Steer about Z-axis
+            %velmsg.Angular.Z = limiter_min_max(omegaZ, -180, 180); % 180deg/s
+%             velmsg.Angular.Z = omegaZ_rad; % calculation in deg but converted to radians
+            velmsg.Angular.Z = omegaZ; % calculation is in radians
+            % Publish velocity and steer to the TurtleBot
+            send(my_turtlebot, velmsg);
+
+            %% Wait the desired Hz time for the actuators to react
+            waitfor(r);
+            
+        end
+            
     end
     
     if enable_ros == false
